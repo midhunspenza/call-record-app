@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    @apply m-0 p-0;
+  }
+  body {
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #0a0a0a;
+    background: #f7f7f7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: #fff4ed;
+    color: #0a0a0a;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+    margin: 0;
+    font-weight: 600;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-eyebrow text-spenza-mute;
+  }
+  .eyebrow-orange {
+    @apply text-spenza-orange;
+  }
+  .mono {
+    font-family: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-ligatures: none;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card {
+    @apply bg-white border border-spenza-border rounded-card shadow-card;
+  }
+
+  /* buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-btn font-medium text-sm whitespace-nowrap transition-[background,box-shadow,transform,color] duration-150 ease-out;
+  }
+  .btn:focus-visible {
+    @apply outline-none shadow-focus;
+  }
+  .btn-primary {
+    @apply bg-spenza-orange text-white;
+  }
+  .btn-primary:hover {
+    background: #d44d09;
+    @apply shadow-orange-hover;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-spenza-ink border border-spenza-border;
+  }
+  .btn-ghost:hover {
+    background: #fafafa;
+  }
+  .btn-sm {
+    @apply h-8 px-3 text-[13px];
+  }
+
+  /* pills */
+  .pill {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-spenza-border;
+    background: #f4f4f4;
+    color: #525252;
+  }
+  .pill .dot {
+    @apply w-1.5 h-1.5 rounded-full bg-spenza-mute;
+  }
+  .pill-mono {
+    font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+    @apply text-[11px] px-2 py-[3px];
+    letter-spacing: 0.02em;
+  }
+  .pill-orange {
+    @apply bg-spenza-orange-soft text-spenza-orange;
+    border-color: #fde0cd;
+  }
+  .pill-orange .dot {
+    @apply bg-spenza-orange;
+  }
+  .pill-dark {
+    background: rgba(255, 255, 255, 0.06);
+    color: #d4d4d4;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  .pill-dark .dot {
+    @apply bg-spenza-success;
+  }
+}
+
+@layer utilities {
+  .scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll::-webkit-scrollbar-thumb {
+    background: #e0e0e0;
+    border-radius: 999px;
+    border: 2px solid #f7f7f7;
+  }
+  .scroll::-webkit-scrollbar-thumb:hover {
+    background: #c8c8c8;
+  }
+}
