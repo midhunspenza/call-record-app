@@ -28,6 +28,9 @@ export const LiveEvent = z.object({
     //   .segment — a finalized utterance once server VAD detects end of speech
     "voice.transcript.delta",
     "voice.transcript.segment",
+    // Per-call QoS report from the SIP-node capture agent (ISIM-718). Unlike
+    // the channels above, this body has a schema we own — see src/lib/qos.ts.
+    "voice.qos.report",
   ]),
   /** When we received it (server-side wall clock). */
   receivedAt: z.string(),

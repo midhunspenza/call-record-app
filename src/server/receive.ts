@@ -60,6 +60,7 @@ const KNOWN_CHANNELS = new Set<LiveEvent["channel"]>([
   "voice.recording.ready",
   "voice.stream.handshake",
   "voice.transcript.ready",
+  "voice.qos.report",
 ]);
 
 function isKnownChannel(v: string): v is LiveEvent["channel"] {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Phone, FileAudio, MessageSquare, LogOut } from "lucide-react";
+import { Home, Phone, FileAudio, MessageSquare, Activity, LogOut } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -16,6 +16,7 @@ const items: NavItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/voice", label: "Live Voice", icon: Phone, badge: "3" },
   { href: "/recordings", label: "Recordings", icon: FileAudio },
+  { href: "/qos", label: "Call Quality", icon: Activity },
   { href: "/sms", label: "SMS", icon: MessageSquare },
 ];
 
