@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Phone, FileAudio, MessageSquare, Activity, LogOut } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -22,6 +22,13 @@ const items: NavItem[] = [
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function signOut() {
+    await fetch("/api/logout", { method: "POST" }).catch(() => undefined);
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <aside className="bg-spenza-charcoal text-white flex flex-col border-r border-spenza-border-dark h-screen w-full lg:w-[248px]">
@@ -80,6 +87,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
         </div>
         <button
           aria-label="Sign out"
+          onClick={signOut}
           className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center text-spenza-mute hover:bg-white/[0.06] hover:text-white transition-[background,color] duration-150"
         >
           <LogOut strokeWidth={1.75} className="w-[18px] h-[18px]" />

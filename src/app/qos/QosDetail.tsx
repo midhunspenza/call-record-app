@@ -4,11 +4,15 @@ import { AlertTriangle, CircleAlert, Info, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/phone";
 import {
+  PATH_EXPERIENCED_BY,
+  PATH_LABEL,
+  RATING_LABEL,
   fmtDbfs,
   fmtMs,
   fmtPct,
   sideLabel,
   type QosFinding,
+  type QosPathQuality,
   type QosReport,
   type QosStream,
 } from "@/lib/qos";
@@ -123,6 +127,66 @@ function StreamCard({ stream }: { stream: QosStream }) {
   );
 }
 
+/** Colour by G.107 satisfaction band. Semantic, separate from the brand accent. */
+const RATING_TONE: Record<NonNullable<QosPathQuality["rating"]>["category"], string> = {
+  best: "text-spenza-success",
+  high: "text-spenza-success",
+  medium: "text-[#B45309]",
+  low: "text-spenza-danger",
+  poor: "text-spenza-danger",
+};
+
+function PathCard({ q }: { q: QosPathQuality }) {
+  return (
+    <div className="border border-spenza-border rounded-input p-3.5">
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <span className="text-[13px] font-semibold text-spenza-ink">{PATH_LABEL[q.path]}</span>
+        {q.rating ? (
+          <span className={cn("text-[13px] font-semibold tabular-nums", RATING_TONE[q.rating.category])}>
+            {q.rating.mosCqe.toFixed(2)}
+            <span className="text-[11px] font-normal text-spenza-mute ml-1">MOS-CQE</span>
+          </span>
+        ) : (
+          <span className="text-[11px] text-spenza-mute">No RTCP</span>
+        )}
+      </div>
+      <p className="text-[11.5px] text-spenza-slate mb-3">{PATH_EXPERIENCED_BY[q.path]}</p>
+
+      {q.rating ? (
+        <div className="mb-3">
+          {/* R factor on its 0-100 scale, with the R=70 acceptability line marked. */}
+          <div className="relative h-1.5 bg-spenza-canvas rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "absolute inset-y-0 left-0 rounded-full",
+                q.rating.rFactor >= 80
+                  ? "bg-spenza-success"
+                  : q.rating.rFactor >= 70
+                    ? "bg-spenza-amber"
+                    : "bg-spenza-danger",
+              )}
+              style={{ width: `${Math.max(2, q.rating.rFactor)}%` }}
+            />
+            <div className="absolute inset-y-0 w-px bg-spenza-slate/40" style={{ left: "70%" }} />
+          </div>
+          <div className="flex justify-between text-[10.5px] font-mono text-spenza-mute mt-1">
+            <span>R {q.rating.rFactor.toFixed(1)}</span>
+            <span className="text-spenza-slate">{RATING_LABEL[q.rating.category]}</span>
+            <span>100</span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-x-4">
+        <Row label="Packet loss" value={fmtPct(q.packetLossPercent === null ? null : q.packetLossPercent / 100, 2)} />
+        <Row label="Jitter, mean" value={fmtMs(q.jitterMsMean)} />
+        <Row label="Jitter, peak" value={fmtMs(q.jitterMsMax)} />
+        <Row label="RTCP reports" value={String(q.reportCount)} />
+      </div>
+    </div>
+  );
+}
+
 export function QosDetail({ report }: { report: QosReport }) {
   const oneWayText =
     report.oneWayAudio === "caller_to_callee"
@@ -199,8 +263,28 @@ export function QosDetail({ report }: { report: QosReport }) {
         </div>
       </Section>
 
+      {report.quality.length > 0 ? (
+        <Section title="Transmission quality, by direction">
+          <p className="text-[12.5px] text-spenza-slate leading-relaxed mb-3 max-w-[62ch]">
+            ITU-T G.107 E-model. Each RTCP report describes what its sender received, so the
+            four paths are measured independently — loss on <em>node → callee</em> points at the
+            far end&apos;s network, loss on <em>caller → node</em> at something upstream of us.
+          </p>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {report.quality.map((q) => (
+              <PathCard key={q.path} q={q} />
+            ))}
+          </div>
+          <p className="text-[11.5px] text-spenza-mute leading-relaxed mt-3 max-w-[62ch]">
+            MOS-CQE is a <strong>parametric</strong> rating from loss, jitter and delay — not a
+            listening-quality score derived from the audio. That would need a reference signal a
+            real call does not carry.
+          </p>
+        </Section>
+      ) : null}
+
       {report.transport ? (
-        <Section title="Transport (RTCP)">
+        <Section title="Transport (RTCP), whole call">
           <Row label="Jitter, peak" value={fmtMs(report.transport.jitterMsMax)} />
           <Row label="Jitter, mean" value={fmtMs(report.transport.jitterMsMean)} />
           <Row

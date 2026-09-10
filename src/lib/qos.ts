@@ -67,6 +67,44 @@ export const QosTransport = z.object({
 });
 export type QosTransport = z.infer<typeof QosTransport>;
 
+/** One directional path through the node. Four exist per call. */
+export const QosPath = z.enum([
+  "caller_to_node",
+  "node_to_caller",
+  "callee_to_node",
+  "node_to_callee",
+]);
+export type QosPath = z.infer<typeof QosPath>;
+
+/**
+ * ITU-T G.107 transmission rating.
+ *
+ * Parametric, not signal-based: computed from packet loss, jitter and delay
+ * rather than by listening to the audio. That is what makes it legitimate
+ * without a reference signal — and why it is labelled MOS-CQE everywhere in
+ * the UI rather than the bare "MOS" most dashboards print.
+ */
+export const QosRating = z.object({
+  rFactor: z.number(),
+  mosCqe: z.number(),
+  category: z.enum(["best", "high", "medium", "low", "poor"]),
+  delayMs: z.number(),
+  method: z.string(),
+});
+export type QosRating = z.infer<typeof QosRating>;
+
+export const QosPathQuality = z.object({
+  path: QosPath,
+  packetLossPercent: z.number().nullable(),
+  packetsLost: z.number().nullable(),
+  jitterMsMax: z.number().nullable(),
+  jitterMsMean: z.number().nullable(),
+  rttMsMean: z.number().nullable(),
+  reportCount: z.number().int().min(0),
+  rating: QosRating.nullable(),
+});
+export type QosPathQuality = z.infer<typeof QosPathQuality>;
+
 export const QosFinding = z.object({
   code: z.string().min(1),
   severity: z.enum(["info", "warn", "critical"]),
@@ -121,6 +159,11 @@ export const QosReport = z.object({
   audio: z.array(QosStream),
   oneWayAudio: z.enum(["caller_to_callee", "callee_to_caller"]).nullable(),
   transport: QosTransport.nullable(),
+  /**
+   * Per-direction quality. Defaulted so a report from an agent predating this
+   * field still validates rather than being rejected mid-rollout.
+   */
+  quality: z.array(QosPathQuality).default([]),
 
   verdict: QosVerdict,
   findings: z.array(QosFinding),
@@ -165,6 +208,30 @@ export const VERDICT_LABEL: Record<QosVerdict, string> = {
 export function sideLabel(side: QosStreamSide): string {
   return side === "caller" ? "Caller → node" : "Callee → node";
 }
+
+/** Direction labels written from the listener's point of view. */
+export const PATH_LABEL: Record<QosPath, string> = {
+  caller_to_node: "Caller → node",
+  node_to_caller: "Node → caller",
+  callee_to_node: "Callee → node",
+  node_to_callee: "Node → callee",
+};
+
+/** Which side experienced this path — what the caller heard, or the callee. */
+export const PATH_EXPERIENCED_BY: Record<QosPath, string> = {
+  caller_to_node: "what we received from the caller",
+  node_to_caller: "what the caller received",
+  callee_to_node: "what we received from the callee",
+  node_to_callee: "what the callee received",
+};
+
+export const RATING_LABEL: Record<QosRating["category"], string> = {
+  best: "Best",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  poor: "Poor",
+};
 
 export function fmtMs(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return "—";
