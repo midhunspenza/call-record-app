@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Phone, FileAudio, MessageSquare, Activity, LogOut } from "lucide-react";
+import { Home, Phone, FileAudio, MessageSquare, Activity, Bot, LogOut } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -17,6 +17,7 @@ const items: NavItem[] = [
   { href: "/voice", label: "Live Voice", icon: Phone, badge: "3" },
   { href: "/recordings", label: "Recordings", icon: FileAudio },
   { href: "/qos", label: "Call Quality", icon: Activity },
+  { href: "/agent", label: "Voice Agent", icon: Bot, badge: "Preview" },
   { href: "/sms", label: "SMS", icon: MessageSquare },
 ];
 
