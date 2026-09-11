@@ -30,6 +30,24 @@ export type CapturedField = { field: string; value: string; ok: boolean };
 
 export type RiskLevel = "clear" | "review" | "blocked";
 
+/**
+ * Four coarse states, not eight fine-grained emotions.
+ *
+ * Voice emotion classification is unreliable across accents, ages and audio
+ * quality — and it degrades worst on exactly the poor-quality lines where
+ * calls go wrong. Reporting "irritated, 62% confident" invites an argument
+ * nobody can win. Four states with an explicit confidence is a claim that can
+ * be defended.
+ */
+export type SentimentState = "positive" | "neutral" | "frustrated" | "angry";
+
+export type SentimentPoint = {
+  atMs: number;
+  state: SentimentState;
+  /** 0–1. Below ~0.6 the reading is shown as uncertain rather than asserted. */
+  confidence: number;
+};
+
 export type AgentCall = {
   id: string;
   from: string;
@@ -67,6 +85,39 @@ export type AgentCall = {
     score: number;
     signals: string[];
     recommendation: string;
+  };
+  /**
+   * How the caller felt, over time.
+   *
+   * A single average is close to useless: a call that starts angry and ends
+   * calm and one that does the reverse average the same and mean opposite
+   * things. Start, end, direction and the moment it turned are the parts worth
+   * acting on — the turning point is where you go to listen.
+   */
+  sentiment: {
+    score: number;
+    start: SentimentState;
+    end: SentimentState;
+    turningPointMs: number | null;
+    turningPointNote: string;
+    track: SentimentPoint[];
+    /** Set when the trajectory reflects pressure tactics, not dissatisfaction. */
+    caveat?: string;
+  };
+  /**
+   * Caller effort — counted from the transcript, never inferred.
+   *
+   * Objective where sentiment is soft: nobody argues about how many times a
+   * person had to repeat themselves. It also carries none of the regulatory
+   * exposure that inferring someone's emotional state does.
+   */
+  effort: {
+    score: number;
+    repeats: number;
+    rephrases: number;
+    escapeAttempts: number;
+    interruptionsByCaller: number;
+    abruptEnd: boolean;
   };
   moments: Moment[];
 };
@@ -111,6 +162,28 @@ export const AGENT_CALLS: AgentCall[] = [
       score: 3,
       signals: [],
       recommendation: "No action. Nothing in this call resembles a known fraud pattern.",
+    },
+    sentiment: {
+      score: 90,
+      start: "neutral",
+      end: "positive",
+      turningPointMs: 9_500,
+      turningPointNote:
+        "The caller changed their mind mid-sentence and the agent simply went with it. Tone lifted from there and stayed up.",
+      track: [
+        { atMs: 0, state: "neutral", confidence: 0.82 },
+        { atMs: 9_500, state: "positive", confidence: 0.76 },
+        { atMs: 42_000, state: "positive", confidence: 0.88 },
+        { atMs: 184_000, state: "positive", confidence: 0.91 },
+      ],
+    },
+    effort: {
+      score: 96,
+      repeats: 0,
+      rephrases: 1,
+      escapeAttempts: 0,
+      interruptionsByCaller: 1,
+      abruptEnd: false,
     },
     moments: [
       { atMs: 400, speaker: "agent", text: "Good morning, thanks for calling Northside Dental — how can I help?", responseMs: 410, flag: "good", note: "Greeting began before the caller had to prompt." },
@@ -161,6 +234,29 @@ export const AGENT_CALLS: AgentCall[] = [
       signals: [],
       recommendation: "No action.",
     },
+    sentiment: {
+      score: 38,
+      start: "neutral",
+      end: "frustrated",
+      turningPointMs: 12_800,
+      turningPointNote:
+        "The agent talked over the caller and repeated its opening prompt. The caller's tone did not recover for the rest of the call.",
+      track: [
+        { atMs: 0, state: "neutral", confidence: 0.79 },
+        { atMs: 12_800, state: "frustrated", confidence: 0.84 },
+        { atMs: 58_000, state: "frustrated", confidence: 0.71 },
+        { atMs: 200_000, state: "angry", confidence: 0.58 },
+        { atMs: 267_000, state: "frustrated", confidence: 0.63 },
+      ],
+    },
+    effort: {
+      score: 31,
+      repeats: 3,
+      rephrases: 2,
+      escapeAttempts: 2,
+      interruptionsByCaller: 4,
+      abruptEnd: false,
+    },
     moments: [
       { atMs: 2_400, speaker: "agent", text: "Thank you for calling. Please state the reason for your call.", responseMs: 2_400, flag: "warn", note: "2.4s of silence before the greeting — callers often speak into the gap." },
       { atMs: 11_000, speaker: "caller", text: "I'm calling about a charge on my— " },
@@ -210,6 +306,30 @@ export const AGENT_CALLS: AgentCall[] = [
       ],
       recommendation:
         "Flagged for review and the number added to the watch list. Retain the recording — this pattern is reportable to the FCC and to the named institution's fraud team.",
+    },
+    sentiment: {
+      score: 40,
+      start: "neutral",
+      end: "angry",
+      turningPointMs: 14_100,
+      turningPointNote:
+        "Tone hardened the moment the agent refused to share a verification code — pressure applied, not frustration felt.",
+      track: [
+        { atMs: 0, state: "neutral", confidence: 0.74 },
+        { atMs: 14_100, state: "frustrated", confidence: 0.69 },
+        { atMs: 22_000, state: "angry", confidence: 0.81 },
+        { atMs: 51_000, state: "angry", confidence: 0.77 },
+      ],
+      caveat:
+        "This call is flagged as fraudulent. The trajectory reflects a pressure tactic rather than a dissatisfied customer, and should not be read as an agent failure.",
+    },
+    effort: {
+      score: 0,
+      repeats: 0,
+      rephrases: 0,
+      escapeAttempts: 0,
+      interruptionsByCaller: 2,
+      abruptEnd: true,
     },
     moments: [
       { atMs: 700, speaker: "caller", text: "This is the fraud department at your bank. We need to verify your identity." },

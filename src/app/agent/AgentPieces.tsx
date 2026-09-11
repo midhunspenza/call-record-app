@@ -4,7 +4,8 @@ import { AlertTriangle, Check, ShieldAlert, ShieldCheck, X } from "lucide-react"
 import { cn } from "@/lib/cn";
 import type { Tone } from "@/lib/qos-presentation";
 import { TONE_STYLES } from "../qos/VerdictPill";
-import type { CapturedField, Moment, RiskLevel } from "./data";
+import { Explain } from "../qos/Explain";
+import type { CapturedField, Moment, RiskLevel, SentimentPoint, SentimentState } from "./data";
 
 /** Score bands shared across every dimension, so 78 means the same thing everywhere. */
 export function bandFor(score: number): { label: string; tone: Tone } {
@@ -168,5 +169,139 @@ export function MomentRow({ moment }: { moment: Moment }) {
         ) : null}
       </div>
     </li>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Sentiment trajectory
+ * ------------------------------------------------------------------ */
+
+export const SENTIMENT: Record<SentimentState, { label: string; colour: string; tone: Tone }> = {
+  positive: { label: "Positive", colour: "#22C55E", tone: "good" },
+  neutral: { label: "Neutral", colour: "#9CA3AF", tone: "neutral" },
+  frustrated: { label: "Frustrated", colour: "#F59E0B", tone: "warn" },
+  angry: { label: "Angry", colour: "#EF4444", tone: "bad" },
+};
+
+/**
+ * The caller's mood across the call, as a band rather than a number.
+ *
+ * The shape is the point: where it changed matters far more than the average.
+ * Segments below 60% confidence are drawn faded and hatched, because asserting
+ * a mood the classifier was unsure about is how this kind of feature loses
+ * people's trust.
+ */
+export function SentimentTrack({
+  track,
+  durationMs,
+  turningPointMs,
+}: {
+  track: SentimentPoint[];
+  durationMs: number;
+  turningPointMs: number | null;
+}) {
+  const segments = track.map((p, i) => {
+    const next = track[i + 1];
+    const endMs = next ? next.atMs : durationMs;
+    return { ...p, widthPct: Math.max(1, ((endMs - p.atMs) / durationMs) * 100) };
+  });
+
+  return (
+    <div>
+      <div className="relative h-8 rounded-lg overflow-hidden flex">
+        {segments.map((seg, i) => {
+          const s = SENTIMENT[seg.state];
+          const unsure = seg.confidence < 0.6;
+          return (
+            <div
+              key={i}
+              className="h-full relative"
+              style={{
+                width: `${seg.widthPct}%`,
+                backgroundColor: s.colour,
+                opacity: unsure ? 0.4 : 1,
+              }}
+              title={`${s.label} — ${Math.round(seg.confidence * 100)}% confident`}
+            >
+              {unsure ? (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 3px, transparent 3px 6px)",
+                  }}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+
+        {turningPointMs !== null ? (
+          <div
+            className="absolute top-0 bottom-0 w-[2px] bg-[#111827]"
+            style={{ left: `${(turningPointMs / durationMs) * 100}%` }}
+          >
+            <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#111827]" />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between mt-2 text-[11px] text-[#9CA3AF]">
+        <span>Call start</span>
+        {turningPointMs !== null ? (
+          <span className="text-[#111827] font-semibold">
+            turned at {(turningPointMs / 1000).toFixed(1)}s
+          </span>
+        ) : null}
+        <span>Call end</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3">
+        {(Object.keys(SENTIMENT) as SentimentState[]).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5 text-[11px] text-[#6B7280]">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: SENTIMENT[k].colour }} />
+            {SENTIMENT[k].label}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-[#9CA3AF]">
+          <span
+            className="w-2.5 h-2.5 rounded-sm bg-[#9CA3AF]"
+            style={{
+              opacity: 0.4,
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 3px, transparent 3px 6px)",
+            }}
+          />
+          Low confidence
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Caller effort — counted, not inferred
+ * ------------------------------------------------------------------ */
+
+export function EffortStat({
+  label,
+  count,
+  goodWhenZero = true,
+  explain,
+}: {
+  label: string;
+  count: number;
+  goodWhenZero?: boolean;
+  explain?: string;
+}) {
+  const tone: Tone = !goodWhenZero ? "neutral" : count === 0 ? "good" : count <= 2 ? "warn" : "bad";
+  return (
+    <div>
+      <div className="text-[11.5px] text-[#6B7280] mb-0.5 flex items-center gap-1">
+        {label}
+        {explain ? <Explain text={explain} /> : null}
+      </div>
+      <div className={cn("text-[18px] font-bold tabular-nums", TONE_STYLES[tone].text)}>{count}</div>
+    </div>
   );
 }

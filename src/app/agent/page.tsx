@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, FlaskConical, Gauge, MessageSquareQuote, ShieldCheck, Target } from "lucide-react";
+import { ArrowDownLeft, FlaskConical, Gauge, Heart, HelpCircle, MessageSquareQuote, ShieldCheck, Target } from "lucide-react";
 import { AppShell } from "@/components/shell/AppShell";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/phone";
@@ -11,9 +11,12 @@ import { Explain } from "../qos/Explain";
 import { AGENT_CALLS, type AgentCall } from "./data";
 import {
   CapturedRow,
+  EffortStat,
   MomentRow,
   RISK_PRESENTATION,
+  SENTIMENT,
   ScoreRing,
+  SentimentTrack,
   TraitBar,
   bandFor,
 } from "./AgentPieces";
@@ -37,6 +40,14 @@ const EXPLAIN = {
   median: "The typical gap before the agent replies across the whole call. People expect roughly what another person would do.",
   bargeIn: "How often the agent stopped talking when the caller cut in. Failing to yield is the single most irritating agent behaviour.",
   captured: "Details the agent was meant to collect, and whether each was recorded correctly. Checked against what the caller actually said.",
+  sentiment:
+    "How the caller's mood moved across the call, and the moment it changed. A call that starts angry and ends calm is a success — an average would hide that, so we show the direction instead.",
+  effort:
+    "How hard the caller had to work to be understood. These are counted from the conversation, not inferred from their voice, so they are not open to argument.",
+  repeats: "Times the caller had to say the same thing again because the agent missed it.",
+  escapes: "Times the caller asked for a human, or tried to opt out of the agent.",
+  interruptions:
+    "Times the caller cut in while the agent was still speaking — usually an attempt to stop it.",
 };
 
 function DimensionCard({
@@ -113,7 +124,7 @@ function Detail({ call }: { call: AgentCall }) {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-7">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-7">
         <DimensionCard
           icon={Gauge}
           label="Responsiveness"
@@ -136,6 +147,24 @@ function Detail({ call }: { call: AgentCall }) {
           caption={`${call.effectiveness.questionsResolved} of ${call.effectiveness.questionsAsked} questions resolved${call.effectiveness.escalated ? ", handed to a person" : ""}.`}
         />
         <DimensionCard
+          icon={Heart}
+          label="Caller sentiment"
+          score={call.sentiment.score}
+          explain={EXPLAIN.sentiment}
+          caption={`${SENTIMENT[call.sentiment.start].label} → ${SENTIMENT[call.sentiment.end].label}`}
+        />
+        <DimensionCard
+          icon={HelpCircle}
+          label="Caller effort"
+          score={call.effort.score}
+          explain={EXPLAIN.effort}
+          caption={
+            call.effort.repeats === 0 && call.effort.escapeAttempts === 0
+              ? "Never had to repeat or ask for a human."
+              : `${call.effort.repeats} repeat${call.effort.repeats === 1 ? "" : "s"}, ${call.effort.escapeAttempts} request${call.effort.escapeAttempts === 1 ? "" : "s"} for a human.`
+          }
+        />
+        <DimensionCard
           icon={ShieldCheck}
           label="Safety"
           score={100 - call.risk.score}
@@ -143,6 +172,60 @@ function Detail({ call }: { call: AgentCall }) {
           caption={risk.label}
         />
       </div>
+
+      {/* Sentiment: the shape of the call, and where it turned. */}
+      <section className="mb-7 rounded-2xl border border-[#E5E7EB] bg-white p-5">
+        <div className="flex items-baseline justify-between gap-4 mb-1">
+          <h3 className="text-[13px] font-semibold text-[#111827]">How the caller felt</h3>
+          <span className="text-[12.5px] font-semibold text-[#6B7280]">
+            {SENTIMENT[call.sentiment.start].label}
+            <span className="mx-1.5 text-[#D1D5DB]">→</span>
+            <span className={cn(TONE_STYLES[SENTIMENT[call.sentiment.end].tone].text)}>
+              {SENTIMENT[call.sentiment.end].label}
+            </span>
+          </span>
+        </div>
+        <p className="text-[12.5px] text-[#6B7280] mb-4 max-w-[68ch]">
+          {call.sentiment.turningPointNote}
+        </p>
+
+        <SentimentTrack
+          track={call.sentiment.track}
+          durationMs={call.durationMs}
+          turningPointMs={call.sentiment.turningPointMs}
+        />
+
+        {call.sentiment.caveat ? (
+          <p className="mt-4 text-[12.5px] text-[#92400E] bg-[#F59E0B]/[0.08] border border-[#F59E0B]/30 rounded-xl px-4 py-3 leading-relaxed">
+            {call.sentiment.caveat}
+          </p>
+        ) : null}
+      </section>
+
+      {/* Effort: the objective half of caller experience. */}
+      <section className="mb-7 rounded-2xl border border-[#E5E7EB] bg-white p-5">
+        <h3 className="text-[13px] font-semibold text-[#111827] mb-0.5">
+          How hard the caller had to work
+        </h3>
+        <p className="text-[12.5px] text-[#6B7280] mb-4 max-w-[68ch]">
+          Counted from the conversation, not inferred from the caller&apos;s voice.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+          <EffortStat label="Had to repeat" count={call.effort.repeats} explain={EXPLAIN.repeats} />
+          <EffortStat label="Rephrased" count={call.effort.rephrases} />
+          <EffortStat label="Asked for a human" count={call.effort.escapeAttempts} explain={EXPLAIN.escapes} />
+          <EffortStat
+            label="Interrupted the agent"
+            count={call.effort.interruptionsByCaller}
+            explain={EXPLAIN.interruptions}
+          />
+        </div>
+        {call.effort.abruptEnd ? (
+          <p className="mt-4 text-[12.5px] text-[#B91C1C]">
+            The caller hung up mid-turn rather than reaching a natural end.
+          </p>
+        ) : null}
+      </section>
 
       {/* Risk first when it matters — nobody wants it below the fold. */}
       {call.risk.level !== "clear" ? (
