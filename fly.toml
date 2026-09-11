@@ -34,6 +34,13 @@ primary_region = "iad"
   method = "GET"
   path = "/api/health"
 
+# Report durability. Without this the QoS store is memory-only and every deploy
+# discards the history — on a pilot taking a few calls a day, each report is
+# evidence that cannot be recreated. QOS_STORE_PATH points inside this mount.
+[mounts]
+  source = "qos_data"
+  destination = "/data"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"

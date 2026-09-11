@@ -4,9 +4,12 @@ import { AlertTriangle, CircleAlert, Info, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatPhone } from "@/lib/phone";
 import {
-  PATH_EXPERIENCED_BY,
   PATH_LABEL,
   RATING_LABEL,
+  pathLabelFor,
+  pathMeaningFor,
+  sideLabelFor,
+  sideRole,
   fmtDbfs,
   fmtMs,
   fmtPct,
@@ -76,12 +79,31 @@ function FindingRow({ finding }: { finding: QosFinding }) {
   );
 }
 
-function StreamCard({ stream }: { stream: QosStream }) {
+function StreamCard({
+  stream,
+  direction,
+}: {
+  stream: QosStream;
+  direction: QosReport["call"]["direction"];
+}) {
   const silent = stream.firstAudioMs === null;
+  const mine = sideRole(stream.side, direction) === "monitored";
   return (
-    <div className="border border-spenza-border rounded-input p-3.5">
+    <div
+      className={cn(
+        "border rounded-input p-3.5",
+        // The monitored number is the one the reader came here about; give it
+        // a quiet visual anchor rather than making them work it out per row.
+        mine ? "border-spenza-orange/40 bg-spenza-orange-soft/40" : "border-spenza-border",
+      )}
+    >
       <div className="flex items-center justify-between gap-3 mb-3">
-        <span className="text-[13px] font-semibold text-spenza-ink">{sideLabel(stream.side)}</span>
+        <span className="text-[13px] font-semibold text-spenza-ink">
+          {sideLabelFor(stream.side, direction)} → node
+          <span className="ml-2 text-[10.5px] font-normal font-mono text-spenza-mute">
+            {stream.side}
+          </span>
+        </span>
         {silent ? (
           <span className="text-[11px] font-semibold text-spenza-danger">No audible audio</span>
         ) : (
@@ -136,11 +158,30 @@ const RATING_TONE: Record<NonNullable<QosPathQuality["rating"]>["category"], str
   poor: "text-spenza-danger",
 };
 
-function PathCard({ q }: { q: QosPathQuality }) {
+function PathCard({
+  q,
+  direction,
+}: {
+  q: QosPathQuality;
+  direction: QosReport["call"]["direction"];
+}) {
+  // Highlight the path that describes what the monitored number received —
+  // usually the one the reader actually wants.
+  const receivedByMonitored =
+    (direction === "inbound" && q.path === "node_to_callee") ||
+    (direction === "outbound" && q.path === "node_to_caller");
   return (
-    <div className="border border-spenza-border rounded-input p-3.5">
+    <div
+      className={cn(
+        "border rounded-input p-3.5",
+        receivedByMonitored ? "border-spenza-orange/40 bg-spenza-orange-soft/40" : "border-spenza-border",
+      )}
+    >
       <div className="flex items-baseline justify-between gap-3 mb-1">
-        <span className="text-[13px] font-semibold text-spenza-ink">{PATH_LABEL[q.path]}</span>
+        <span className="text-[13px] font-semibold text-spenza-ink">
+          {pathLabelFor(q.path, direction)}
+          <span className="ml-2 text-[10.5px] font-normal font-mono text-spenza-mute">{PATH_LABEL[q.path]}</span>
+        </span>
         {q.rating ? (
           <span className={cn("text-[13px] font-semibold tabular-nums", RATING_TONE[q.rating.category])}>
             {q.rating.mosCqe.toFixed(2)}
@@ -150,7 +191,7 @@ function PathCard({ q }: { q: QosPathQuality }) {
           <span className="text-[11px] text-spenza-mute">No RTCP</span>
         )}
       </div>
-      <p className="text-[11.5px] text-spenza-slate mb-3">{PATH_EXPERIENCED_BY[q.path]}</p>
+      <p className="text-[11.5px] text-spenza-slate mb-3">{pathMeaningFor(q.path, direction)}</p>
 
       {q.rating ? (
         <div className="mb-3">
@@ -207,8 +248,9 @@ export function QosDetail({ report }: { report: QosReport }) {
           {formatPhone(report.call.callerNumber)} → {formatPhone(report.call.calleeNumber)}
         </h2>
         <p className="text-[12.5px] text-spenza-slate mt-1">
-          {new Date(report.call.startedAt).toLocaleString()} · instrumented number{" "}
-          {formatPhone(report.call.gatedNumber)}
+          {new Date(report.call.startedAt).toLocaleString()} ·{" "}
+          {report.call.direction === "inbound" ? "inbound to" : "outbound from"}{" "}
+          <strong className="text-spenza-ink">{formatPhone(report.call.gatedNumber)}</strong>
         </p>
       </header>
 
@@ -258,7 +300,9 @@ export function QosDetail({ report }: { report: QosReport }) {
           {report.audio.length === 0 ? (
             <p className="text-[13px] text-spenza-slate">No audio was captured for this call.</p>
           ) : (
-            report.audio.map((s) => <StreamCard key={s.side} stream={s} />)
+            report.audio.map((s) => (
+              <StreamCard key={s.side} stream={s} direction={report.call.direction} />
+            ))
           )}
         </div>
       </Section>
@@ -272,7 +316,7 @@ export function QosDetail({ report }: { report: QosReport }) {
           </p>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             {report.quality.map((q) => (
-              <PathCard key={q.path} q={q} />
+              <PathCard key={q.path} q={q} direction={report.call.direction} />
             ))}
           </div>
           <p className="text-[11.5px] text-spenza-mute leading-relaxed mt-3 max-w-[62ch]">

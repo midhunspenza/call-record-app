@@ -209,6 +209,66 @@ export function sideLabel(side: QosStreamSide): string {
   return side === "caller" ? "Caller → node" : "Callee → node";
 }
 
+/* ------------------------------------------------------------------ *
+ * Direction-aware labelling.
+ *
+ * The raw model names the two parties "caller" and "callee" — properties of the
+ * call, not of the number being monitored. Somebody reading this screen wants
+ * to know which side is THEIRS, and working that out from call direction on
+ * every row is friction that leads to misreading a report.
+ *
+ * `direction` tells us which role the monitored number played: on an inbound
+ * call it was the callee, on an outbound call it was the caller.
+ * ------------------------------------------------------------------ */
+
+export type CallDirection = "inbound" | "outbound";
+
+/** Was this captured stream the monitored number, or the other party? */
+export function sideRole(side: QosStreamSide, direction: CallDirection): "monitored" | "far" {
+  const monitoredSide: QosStreamSide = direction === "inbound" ? "callee" : "caller";
+  return side === monitoredSide ? "monitored" : "far";
+}
+
+export function sideLabelFor(side: QosStreamSide, direction: CallDirection): string {
+  return sideRole(side, direction) === "monitored" ? "Your number" : "Far party";
+}
+
+/** Which end of a one-way path is the monitored number, if either. */
+export function pathLabelFor(path: QosPath, direction: CallDirection): string {
+  const { side, towardParty } = PATH_PARTS[path];
+  const party = sideLabelFor(side, direction);
+  return towardParty ? `Node → ${party.toLowerCase()}` : `${party} → node`;
+}
+
+/**
+ * Which party each path concerns, and whether the node is sending or receiving.
+ *
+ * Written as an explicit map rather than derived from the string. A first
+ * version used `path.endsWith("caller")`, which is false for `caller_to_node`
+ * — that ends in "node" — and silently inverted the meaning of two of the four
+ * paths, captioning the far party's audio as "what your number sent".
+ */
+const PATH_PARTS: Record<QosPath, { side: QosStreamSide; towardParty: boolean }> = {
+  caller_to_node: { side: "caller", towardParty: false },
+  node_to_caller: { side: "caller", towardParty: true },
+  callee_to_node: { side: "callee", towardParty: false },
+  node_to_callee: { side: "callee", towardParty: true },
+};
+
+/** Plain-English statement of what a path's numbers actually describe. */
+export function pathMeaningFor(path: QosPath, direction: CallDirection): string {
+  const { side, towardParty: toward } = PATH_PARTS[path];
+  const isMonitored = sideRole(side, direction) === "monitored";
+  if (toward) {
+    return isMonitored
+      ? "what your number received — the quality experienced at your end"
+      : "what the far party received — the quality they experienced";
+  }
+  return isMonitored
+    ? "what your number sent, as it reached the node"
+    : "what the far party sent, as it reached the node";
+}
+
 /** Direction labels written from the listener's point of view. */
 export const PATH_LABEL: Record<QosPath, string> = {
   caller_to_node: "Caller → node",
