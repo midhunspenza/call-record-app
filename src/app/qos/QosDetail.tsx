@@ -24,6 +24,7 @@ import {
   type Tone,
 } from "@/lib/qos-presentation";
 import { TONE_STYLES, TonePill } from "./VerdictPill";
+import { EXPLAINS, Explain } from "./Explain";
 
 /**
  * The customer-facing call report.
@@ -49,15 +50,20 @@ function Metric({
   value,
   tone = "neutral",
   detail,
+  explain,
 }: {
   label: string;
   value: string;
   tone?: Tone;
   detail?: string;
+  explain?: string;
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11.5px] text-[#6B7280] mb-0.5">{label}</div>
+      <div className="text-[11.5px] text-[#6B7280] mb-0.5 flex items-center gap-1">
+        {label}
+        {explain ? <Explain text={explain} /> : null}
+      </div>
       <div className={cn("text-[14px] font-semibold tabular-nums", TONE_STYLES[tone].text)}>{value}</div>
       {detail ? <div className="text-[11px] text-[#9CA3AF] mt-0.5">{detail}</div> : null}
     </div>
@@ -97,18 +103,22 @@ function AudioCard({ stream, direction }: { stream: QosStream; direction: QosRep
         <div className="grid grid-cols-2 gap-x-5 gap-y-4">
           <Metric
             label="First audio heard"
+            explain={EXPLAINS.firstAudioHeard}
             value={stream.firstAudioMs === null ? "None" : seconds(stream.firstAudioMs)}
             tone={stream.firstAudioMs === null ? "bad" : stream.firstAudioMs > 800 ? "warn" : "good"}
             detail="after the call connected"
           />
-          <Metric label="Audio level" value={level.label} tone={level.tone} />
+          <Metric label="Audio level"
+            explain={EXPLAINS.audioLevel} value={level.label} tone={level.tone} />
           <Metric
             label="Dropouts"
+            explain={EXPLAINS.dropouts}
             value={dropouts === 0 ? "None" : `${dropouts}`}
             tone={dropouts === 0 ? "good" : "warn"}
             detail={dropouts > 0 ? `longest ${seconds(stream.longestGapMs)}` : undefined}
           />
-          <Metric label="Distortion" value={distortion.label} tone={distortion.tone} />
+          <Metric label="Distortion"
+            explain={EXPLAINS.distortion} value={distortion.label} tone={distortion.tone} />
         </div>
       )}
     </div>
@@ -135,7 +145,10 @@ function QualityCard({ q, direction }: { q: QosPathQuality; direction: QosReport
             <div className={cn("text-[22px] font-bold leading-none tabular-nums", TONE_STYLES[band.tone].text)}>
               {scoreOutOfFive(rating)}
             </div>
-            <div className="text-[10.5px] text-[#9CA3AF] mt-1">out of 5</div>
+            <div className="text-[10.5px] text-[#9CA3AF] mt-1 flex items-center gap-1 justify-end">
+              out of 5
+              <Explain text={EXPLAINS.qualityScore} />
+            </div>
           </div>
         ) : null}
       </div>
@@ -163,12 +176,14 @@ function QualityCard({ q, direction }: { q: QosPathQuality; direction: QosReport
       <div className="grid grid-cols-2 gap-x-5 gap-y-4 pt-4 border-t border-[#E5E7EB]">
         <Metric
           label="Packet loss"
+            explain={EXPLAINS.packetLoss}
           value={loss.label}
           tone={loss.tone}
           detail={q.packetLossPercent !== null ? percent(q.packetLossPercent) : undefined}
         />
         <Metric
           label="Jitter"
+          explain={EXPLAINS.jitter}
           value={q.jitterMsMean === null ? "—" : seconds(q.jitterMsMean)}
           tone={q.jitterMsMean !== null && q.jitterMsMean > 30 ? "warn" : "good"}
           detail={q.jitterMsMax !== null ? `peak ${seconds(q.jitterMsMax)}` : undefined}
@@ -251,6 +266,7 @@ export function QosDetail({ report }: { report: QosReport }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 rounded-2xl border border-[#E5E7EB] bg-white p-5">
           <Metric
             label="Time to ring"
+            explain={EXPLAINS.timeToRing}
             value={seconds(report.timing.signalingRingingMs)}
             tone={
               report.timing.signalingRingingMs !== null && report.timing.signalingRingingMs > 4000
@@ -258,13 +274,15 @@ export function QosDetail({ report }: { report: QosReport }) {
                 : "good"
             }
           />
-          <Metric label="Time to answer" value={seconds(report.timing.answerDelayMs)} />
+          <Metric label="Time to answer"
+            explain={EXPLAINS.timeToAnswer} value={seconds(report.timing.answerDelayMs)} />
           <Metric
             label="Answered"
+            explain={EXPLAINS.answered}
             value={report.call.answered ? "Yes" : "No"}
             tone={report.call.answered ? "good" : "neutral"}
           />
-          <Metric label="Call ended" value={endedText(report.call.hangupCause)} />
+          <Metric label="Call ended" explain={EXPLAINS.callEnded} value={endedText(report.call.hangupCause)} />
         </div>
       </Section>
 

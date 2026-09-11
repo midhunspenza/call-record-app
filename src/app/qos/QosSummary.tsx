@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { median, type QosVerdict, type StoredQosReport } from "@/lib/qos";
 import { MEASUREMENT_NOTE, seconds, type Tone } from "@/lib/qos-presentation";
 import { TONE_STYLES } from "./VerdictPill";
+import { EXPLAINS, Explain } from "./Explain";
 
 /**
  * Overview strip.
@@ -23,15 +24,20 @@ function Tile({
   value,
   sub,
   tone = "neutral",
+  explain,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: Tone;
+  explain?: string;
 }) {
   return (
     <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 min-w-0">
-      <div className="text-[11.5px] font-medium text-[#6B7280] mb-2">{label}</div>
+      <div className="text-[11.5px] font-medium text-[#6B7280] mb-2 flex items-center gap-1.5">
+        {label}
+        {explain ? <Explain text={explain} /> : null}
+      </div>
       <div className={cn("text-[26px] font-bold leading-none tabular-nums tracking-tight", TONE_STYLES[tone].text)}>
         {value}
       </div>
@@ -67,11 +73,13 @@ export function QosSummary({ reports }: { reports: StoredQosReport[] }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Tile
           label="Calls measured"
+          explain={EXPLAINS.callsMeasured}
           value={String(total)}
           sub={total === 0 ? "Nothing measured yet" : "Most recent 100"}
         />
         <Tile
           label="Quality on your line"
+          explain={EXPLAINS.qualityOnYourLine}
           value={avgScore ?? "—"}
           sub={avgScore ? "average score, out of 5" : "No scored calls yet"}
           tone={
@@ -80,12 +88,14 @@ export function QosSummary({ reports }: { reports: StoredQosReport[] }) {
         />
         <Tile
           label="Calls without issues"
+          explain={EXPLAINS.callsWithoutIssues}
           value={total === 0 ? "—" : `${good} of ${total}`}
           sub={total === 0 ? "No calls to judge" : `${degraded} with issues · ${failing} poor`}
           tone={failing > 0 ? "bad" : degraded > 0 ? "warn" : good > 0 ? "good" : "neutral"}
         />
         <Tile
           label="Typical time to ring"
+          explain={EXPLAINS.typicalTimeToRing}
           value={seconds(medianRing)}
           sub={medianFirstAudio !== null ? `audio after ${seconds(medianFirstAudio)}` : undefined}
         />

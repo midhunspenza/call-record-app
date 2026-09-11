@@ -112,18 +112,22 @@ export default function QosPage() {
         ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-4 items-start">
-          <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-5 py-3.5 border-b border-[#E5E7EB]">
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100vh-7rem)] lg:flex lg:flex-col">
+            <div className="px-5 py-3.5 border-b border-[#E5E7EB] shrink-0">
               <span className="text-[12px] font-semibold text-[#111827]">Recent calls</span>
             </div>
+            <div className="lg:overflow-y-auto lg:min-h-0">
             {loading ? (
               <p className="p-8 text-[13px] text-[#9CA3AF]">Loading…</p>
             ) : (
               <QosList reports={visible} selectedId={selectedId} onSelect={setSelectedId} />
             )}
+            </div>
           </div>
 
-          <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm min-h-[320px]">
+          {/* No overflow-hidden here: tooltips inside open upward and would be
+              clipped at the card edge. Nothing in the detail panel overflows. */}
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl shadow-sm min-h-[320px]">
             {selected ? (
               <QosDetail report={selected} />
             ) : (
