@@ -1,52 +1,41 @@
 "use client";
 
-import { Info } from "lucide-react";
-import { fmtMs, median, type QosVerdict, type StoredQosReport } from "@/lib/qos";
+import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { median, type QosVerdict, type StoredQosReport } from "@/lib/qos";
+import { MEASUREMENT_NOTE, seconds, type Tone } from "@/lib/qos-presentation";
+import { TONE_STYLES } from "./VerdictPill";
 
 /**
- * Summary strip above the report list.
+ * Overview strip.
  *
- * Two rules it follows, both from the measurement discipline in ISIM-718:
+ * Two rules it follows, both load-bearing:
  *
- *  - Counts are shown as "n of m", never as a bare success rate. Four good
- *    calls is not a 100% success rate, and a percentage on a tiny sample reads
- *    as a far stronger claim than the data supports.
- *  - The coverage label is printed, not implied. A SIP-trunk result is not a
- *    nationwide deliverability result.
+ *  - Counts are "n of m", never a bare percentage. Four good calls is not a
+ *    100% success rate, and a percentage on a small sample reads as a far
+ *    stronger claim than the data supports.
+ *  - Nothing here names the carrier or our infrastructure — see
+ *    qos-presentation.ts for the full boundary.
  */
 
 function Tile({
   label,
   value,
   sub,
-  tone = "default",
+  tone = "neutral",
 }: {
   label: string;
   value: string;
   sub?: string;
-  tone?: "default" | "good" | "warn" | "bad";
+  tone?: Tone;
 }) {
-  const toneClass =
-    tone === "good"
-      ? "text-spenza-success"
-      : tone === "warn"
-        ? "text-[#B45309]"
-        : tone === "bad"
-          ? "text-spenza-danger"
-          : "text-spenza-ink";
   return (
-    <div className="bg-spenza-surface border border-spenza-border rounded-card p-4 min-w-0">
-      <div
-        className="text-[10px] font-semibold uppercase text-spenza-mute mb-1.5"
-        style={{ letterSpacing: "0.14em" }}
-      >
-        {label}
-      </div>
-      <div className={cn("text-[22px] font-semibold leading-none tabular-nums", toneClass)}>
+    <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 min-w-0">
+      <div className="text-[11.5px] font-medium text-[#6B7280] mb-2">{label}</div>
+      <div className={cn("text-[26px] font-bold leading-none tabular-nums tracking-tight", TONE_STYLES[tone].text)}>
         {value}
       </div>
-      {sub ? <div className="text-[12px] text-spenza-slate mt-1.5 leading-snug">{sub}</div> : null}
+      {sub ? <div className="text-[12px] text-[#9CA3AF] mt-2 leading-snug">{sub}</div> : null}
     </div>
   );
 }
@@ -55,55 +44,56 @@ export function QosSummary({ reports }: { reports: StoredQosReport[] }) {
   const total = reports.length;
   const count = (v: QosVerdict) => reports.filter((r) => r.report.verdict === v).length;
 
-  const healthy = count("healthy");
+  const good = count("healthy");
   const degraded = count("degraded");
   const failing = count("failing");
 
-  const medianRinging = median(reports.map((r) => r.report.timing.signalingRingingMs));
-  const medianFirstAudio = median(
-    reports.flatMap((r) => r.report.audio.map((a) => a.firstAudioMs)),
-  );
+  const medianRing = median(reports.map((r) => r.report.timing.signalingRingingMs));
+  const medianFirstAudio = median(reports.flatMap((r) => r.report.audio.map((a) => a.firstAudioMs)));
 
-  const coverage = reports[0]?.report.coverage ?? null;
+  // Average the score a customer's own line received, which is the one that
+  // answers "how were my calls?" — not a blend of all four directions.
+  const yourScores = reports.flatMap((r) => {
+    const wanted = r.report.call.direction === "inbound" ? "node_to_callee" : "node_to_caller";
+    const q = r.report.quality.find((x) => x.path === wanted);
+    return q?.rating ? [q.rating.mosCqe] : [];
+  });
+  const avgScore = yourScores.length
+    ? (yourScores.reduce((a, b) => a + b, 0) / yourScores.length).toFixed(1)
+    : null;
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Tile
           label="Calls measured"
           value={String(total)}
-          sub={total === 0 ? "Nothing captured yet" : "Most recent 100"}
+          sub={total === 0 ? "Nothing measured yet" : "Most recent 100"}
         />
         <Tile
-          label="Verdict"
-          value={total === 0 ? "—" : `${healthy} of ${total}`}
-          sub={
-            total === 0
-              ? "No calls to judge"
-              : `${healthy} healthy · ${degraded} degraded · ${failing} failing`
+          label="Quality on your line"
+          value={avgScore ?? "—"}
+          sub={avgScore ? "average score, out of 5" : "No scored calls yet"}
+          tone={
+            avgScore === null ? "neutral" : Number(avgScore) >= 4 ? "good" : Number(avgScore) >= 3.6 ? "warn" : "bad"
           }
-          tone={failing > 0 ? "bad" : degraded > 0 ? "warn" : healthy > 0 ? "good" : "default"}
         />
         <Tile
-          label="Median time to ringing"
-          value={fmtMs(medianRinging)}
-          sub="Signalling on the trunk, not a handset"
+          label="Calls without issues"
+          value={total === 0 ? "—" : `${good} of ${total}`}
+          sub={total === 0 ? "No calls to judge" : `${degraded} with issues · ${failing} poor`}
+          tone={failing > 0 ? "bad" : degraded > 0 ? "warn" : good > 0 ? "good" : "neutral"}
         />
         <Tile
-          label="Median first audio"
-          value={fmtMs(medianFirstAudio)}
-          sub="From bridge to first audible frame"
+          label="Typical time to ring"
+          value={seconds(medianRing)}
+          sub={medianFirstAudio !== null ? `audio after ${seconds(medianFirstAudio)}` : undefined}
         />
       </div>
 
-      <div className="flex items-start gap-2.5 bg-spenza-orange-soft border border-[#FFD9C0] rounded-card px-4 py-3">
-        <Info className="w-4 h-4 text-spenza-orange shrink-0 mt-0.5" strokeWidth={2} />
-        <p className="text-[12.5px] text-[#7C3A12] leading-relaxed">
-          Measured at the Asterisk boundary{coverage ? ` over ${coverage}` : ""}. These figures show
-          what arrived at the node from each side — not what a handset played, and not nationwide
-          deliverability. No listening-quality score is shown: scoring one needs a known reference
-          signal, which real customer calls do not carry.
-        </p>
+      <div className="flex items-start gap-3 rounded-2xl border border-[#E5E7EB] bg-[#FDFCFB] px-5 py-4">
+        <ShieldCheck className="w-4 h-4 text-[#2FA36A] shrink-0 mt-0.5" strokeWidth={2} />
+        <p className="text-[12.5px] text-[#6B7280] leading-relaxed max-w-[76ch]">{MEASUREMENT_NOTE}</p>
       </div>
     </div>
   );

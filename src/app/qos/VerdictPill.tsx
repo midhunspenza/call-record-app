@@ -1,37 +1,51 @@
 import { cn } from "@/lib/cn";
-import { VERDICT_LABEL, type QosVerdict } from "@/lib/qos";
+import { VERDICT_PRESENTATION, type Tone } from "@/lib/qos-presentation";
+import type { QosVerdict } from "@/lib/qos";
 
 /**
- * Verdict is encoded in shape as well as colour — a dot plus a word — so the
- * state survives a greyscale print and a red/green colour deficiency.
+ * Status is carried by a dot AND a word, so it survives greyscale printing and
+ * red/green colour deficiency.
+ *
+ * Note the palette: semantic status uses green/amber/red, never the brand
+ * orange. Orange is reserved for actions — a status chip is not an action, and
+ * using the CTA colour for "degraded" would make a fault look clickable.
  */
-const STYLES: Record<QosVerdict, { chip: string; dot: string }> = {
-  healthy: { chip: "bg-spenza-success-soft text-spenza-success", dot: "bg-spenza-success" },
-  degraded: { chip: "bg-[#FFFBEB] text-[#B45309]", dot: "bg-spenza-amber" },
-  failing: { chip: "bg-spenza-danger-soft text-spenza-danger", dot: "bg-spenza-danger" },
-  insufficient_data: { chip: "bg-[#F5F5F5] text-spenza-slate", dot: "bg-spenza-mute" },
+export const TONE_STYLES: Record<Tone, { chip: string; dot: string; text: string }> = {
+  good: { chip: "bg-[#22C55E]/10 text-[#15803D]", dot: "bg-[#22C55E]", text: "text-[#15803D]" },
+  warn: { chip: "bg-[#F59E0B]/12 text-[#B45309]", dot: "bg-[#F59E0B]", text: "text-[#B45309]" },
+  bad: { chip: "bg-[#EF4444]/10 text-[#B91C1C]", dot: "bg-[#EF4444]", text: "text-[#B91C1C]" },
+  neutral: { chip: "bg-[#F3F4F6] text-[#6B7280]", dot: "bg-[#9CA3AF]", text: "text-[#6B7280]" },
 };
 
-export function VerdictPill({
-  verdict,
+export function TonePill({
+  tone,
+  children,
   className,
 }: {
-  verdict: QosVerdict;
+  tone: Tone;
+  children: React.ReactNode;
   className?: string;
 }) {
-  const s = STYLES[verdict];
+  const s = TONE_STYLES[tone];
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-semibold whitespace-nowrap",
         s.chip,
         className,
       )}
     >
       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", s.dot)} />
-      {VERDICT_LABEL[verdict]}
+      {children}
     </span>
   );
 }
 
-export const VERDICT_STYLES = STYLES;
+export function VerdictPill({ verdict, className }: { verdict: QosVerdict; className?: string }) {
+  const v = VERDICT_PRESENTATION[verdict];
+  return (
+    <TonePill tone={v.tone} className={className}>
+      {v.label}
+    </TonePill>
+  );
+}
